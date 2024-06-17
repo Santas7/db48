@@ -1,49 +1,65 @@
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 
-const db = new sqlite3.Database('./users.db', (err) => {
+const connectionString = 'postgres://users_tua0_user:KLByIOknXOtSWNdfywncaqaiui0clnyl@dpg-cpntl688fa8c73b75pl0-a.oregon-postgres.render.com/users_tua0';
+
+const pool = new Pool({
+    connectionString: connectionString,
+    ssl: {
+        rejectUnauthorized: false,
+    },
+});
+
+pool.connect((err) => {
     if (err) {
-        console.error('Ошибка при открытии базы данных', err.message);
+        console.error('Ошибка при подключении к базе данных', err.message);
         throw err;
     } else {
         console.log('Подключение к базе данных успешно установлено');
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            phone_number TEXT UNIQUE,
-            username TEXT,
-            admin_status INTEGER DEFAULT 0,
-            city TEXT,
-            lang TEXT,
-            code TEXT,
-            attempts INTEGER DEFAULT 0
-        )`);
-        db.run(`CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY,
-            text TEXT,
-            date TEXT,
-            creator TEXT,
-            recipient TEXT,
-            success INTEGER,
-            group_id INTEGER,
-            FOREIGN KEY(group_id) REFERENCES groups(id)
-        )`);
-        db.run(`CREATE TABLE IF NOT EXISTS groupsUsers (
-            id INTEGER PRIMARY KEY,
-            group_name TEXT,
-            group_id INTEGER,
-            group_creator TEXT,
-            username TEXT
-        )`);
-  
-        db.run(`CREATE TABLE IF NOT EXISTS groups (
-            id INTEGER PRIMARY KEY,
-            group_name TEXT,
-            creator TEXT
-        )`);
+        pool.query(`
+            CREATE TABLE IF NOT EXISTS groups (
+                id SERIAL PRIMARY KEY,
+                group_name TEXT,
+                creator TEXT
+            );
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                phone_number TEXT UNIQUE,
+                username TEXT,
+                admin_status INTEGER DEFAULT 0,
+                city TEXT,
+                lang TEXT,
+                code TEXT,
+                attempts INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                text TEXT,
+                date TEXT,
+                creator TEXT,
+                recipient TEXT,
+                success INTEGER,
+                group_id INTEGER,
+                FOREIGN KEY(group_id) REFERENCES groups(id)
+            );
+            CREATE TABLE IF NOT EXISTS groupsUsers (
+                id SERIAL PRIMARY KEY,
+                group_name TEXT,
+                group_id INTEGER,
+                group_creator TEXT,
+                username TEXT
+            );
+        `, (err) => {
+            if (err) {
+                console.error('Ошибка при создании таблиц', err.message);
+            } else {
+                console.log('Таблицы успешно созданы');
+            }
+        });
     }
 });
 
 const addUser = (chatId, phone_number, username) => {
-    db.run(`INSERT INTO users (id, phone_number, username) VALUES (?, ?, ?)`, [chatId, phone_number, username], (err) => {
+    pool.query(`INSERT INTO users (id, phone_number, username) VALUES ($1, $2, $3)`, [chatId, phone_number, username], (err) => {
         if (err) {
             console.error('Ошибка при добавлении пользователя:', err.message);
         } else {
@@ -52,26 +68,22 @@ const addUser = (chatId, phone_number, username) => {
     });
 };
 
-
-
 const getChatID = (phoneNumber) => {
     return new Promise((resolve, reject) => {
-        db.get(`SELECT id FROM users WHERE phone_number = ?`, [phoneNumber], (err, row) => {
+        pool.query(`SELECT id FROM users WHERE phone_number = $1`, [phoneNumber], (err, res) => {
             if (err) {
                 console.error('Ошибка при выполнении запроса:', err.message);
                 reject(err);
             } else {
-                resolve(row);
+                resolve(res.rows[0]);
             }
         });
     });
 };
 
-
-
 const updateUser = (phoneNumber, code) => {
     return new Promise((resolve, reject) => {
-        db.run(`UPDATE users SET code = ? WHERE phone_number = ?`, [code, phoneNumber], (err) => {
+        pool.query(`UPDATE users SET code = $1 WHERE phone_number = $2`, [code, phoneNumber], (err) => {
             if (err) {
                 console.error('Ошибка при обновлении данных пользователя:', err.message);
                 reject(err);
@@ -84,31 +96,32 @@ const updateUser = (phoneNumber, code) => {
 };
 
 const addTask = (text, date, creator, to, group_id) => {
-    db.run(`INSERT INTO tasks (text, date, creator, recipient, group_id) VALUES (?, ?, ?, ?, ?)`, 
-           [text, date, creator, to, group_id], 
-           (err) => {
-        if (err) {
-            console.error('Ошибка при добавлении задачи:', err.message);
-        } else {
-            console.log('Задача успешно добавлена в базу данных');
-        }
-    });
+    pool.query(`INSERT INTO tasks (text, date, creator, recipient, group_id) VALUES ($1, $2, $3, $4, $5)`,
+        [text, date, creator, to, group_id],
+        (err) => {
+            if (err) {
+                console.error('Ошибка при добавлении задачи:', err.message);
+            } else {
+                console.log('Задача успешно добавлена в базу данных');
+            }
+        });
 };
+
 const getAllUsers = () => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT username FROM users`, [], (err, rows) => {
+        pool.query(`SELECT username FROM users`, [], (err, res) => {
             if (err) {
                 console.error('Ошибка при получении пользователей:', err.message);
                 reject(err);
             } else {
-                resolve(rows);
+                resolve(res.rows);
             }
         });
     });
 };
 
 const deleteTask = (taskId) => {
-    db.run(`DELETE FROM tasks WHERE id = ?`, [taskId], (err) => {
+    pool.query(`DELETE FROM tasks WHERE id = $1`, [taskId], (err) => {
         if (err) {
             console.error('Ошибка при удалении задачи:', err.message);
         } else {
@@ -116,9 +129,10 @@ const deleteTask = (taskId) => {
         }
     });
 };
+
 const updateTask = (taskId, text, date, creator, recipient, success, group_id) => {
-    db.run(
-        `UPDATE tasks SET text = ?, date = ?, creator = ?, recipient = ?, success = ?, group_id = ? WHERE id = ?`,
+    pool.query(
+        `UPDATE tasks SET text = $1, date = $2, creator = $3, recipient = $4, success = $5, group_id = $6 WHERE id = $7`,
         [text, date, creator, recipient, success, group_id, taskId],
         (err) => {
             if (err) {
@@ -132,19 +146,19 @@ const updateTask = (taskId, text, date, creator, recipient, success, group_id) =
 
 const getAllTasksByTo = (to) => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT * FROM tasks WHERE recipient = ?`, [to], (err, rows) => {
+        pool.query(`SELECT * FROM tasks WHERE recipient = $1`, [to], (err, res) => {
             if (err) {
                 console.error('Ошибка при получении задач:', err.message);
                 reject(err);
             } else {
-                resolve(rows);
+                resolve(res.rows);
             }
         });
     });
 };
 
 const addGroup = (group_name, creator) => {
-    db.run(`INSERT INTO groups (group_name, creator) VALUES (?, ?)`, [group_name, creator], (err) => {
+    pool.query(`INSERT INTO groups (group_name, creator) VALUES ($1, $2)`, [group_name, creator], (err) => {
         if (err) {
             console.error('Ошибка при добавлении группы:', err.message);
         } else {
@@ -153,40 +167,29 @@ const addGroup = (group_name, creator) => {
     });
 };
 
-
 const moveTaskToNextDay = (task, currentDate) => {
-    // Разбиваем строку даты на компоненты: день, месяц, год
     const [day, month, year] = task.date.split('.');
-    
-    // Создаем новый объект Date на основе компонентов даты задачи
     const nextDate = new Date(Number(year), Number(month) - 1, Number(day));
-    nextDate.setDate(nextDate.getDate() + 1); // Увеличиваем текущую дату на 1 день
-
-    // Форматируем новую дату в нужный формат
+    nextDate.setDate(nextDate.getDate() + 1);
     const formattedNextDate = nextDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
-
-    // Обновляем дату задачи в базе данных, оставляя остальные данные без изменений
     updateTask(task.id, task.text, formattedNextDate, task.creator, task.recipient, task.group_id);
 };
 
-
 const getTaskById = (taskId) => {
     return new Promise((resolve, reject) => {
-        db.get(`SELECT * FROM tasks WHERE id = ?`, [taskId], (err, row) => {
+        pool.query(`SELECT * FROM tasks WHERE id = $1`, [taskId], (err, res) => {
             if (err) {
                 console.error('Ошибка при получении задачи по ID:', err.message);
                 reject(err);
             } else {
-                resolve(row);
+                resolve(res.rows[0]);
             }
         });
     });
 };
 
-
-
 const deleteGroup = (groupId) => {
-    db.run(`DELETE FROM groups WHERE id = ?`, [groupId], (err) => {
+    pool.query(`DELETE FROM groups WHERE id = $1`, [groupId], (err) => {
         if (err) {
             console.error('Ошибка при удалении группы:', err.message);
         } else {
@@ -197,27 +200,26 @@ const deleteGroup = (groupId) => {
 
 const getAllTasksInUsers = (user) => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT * FROM tasks WHERE creator = ?`, [user], (err, rows) => {
+        pool.query(`SELECT * FROM tasks WHERE creator = $1`, [user], (err, res) => {
             if (err) {
                 console.error('Ошибка при получении задач в группе:', err.message);
                 reject(err);
             } else {
-                console.log("Tasks fetched successfully for user:", rows);
-                resolve(rows);
+                console.log("Tasks fetched successfully for user:", res.rows);
+                resolve(res.rows);
             }
         });
     });
 };
 
-
 const getAllGroupsByUsername = (username) => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT * FROM groups WHERE creator = ?`, [username], (err, rows) => {
+        pool.query(`SELECT * FROM groups WHERE creator = $1`, [username], (err, res) => {
             if (err) {
                 console.error('Ошибка при получении групп по имени пользователя:', err.message);
                 reject(err);
             } else {
-                resolve(rows);
+                resolve(res.rows);
             }
         });
     });
@@ -225,64 +227,98 @@ const getAllGroupsByUsername = (username) => {
 
 const checkUser = (username) => {
     return new Promise((resolve, reject) => {
-        // Выполняем запрос к базе данных для поиска пользователя по имени пользователя (username)
-        db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
+        pool.query('SELECT * FROM users WHERE username = $1', [username], (err, res) => {
             if (err) {
-                reject(err); // Если произошла ошибка, отклоняем обещание с ошибкой
+                reject(err);
             } else {
-                resolve(row); // Возвращаем пользователя (или null, если не найден)
+                resolve(res.rows[0]);
             }
         });
     });
 };
+
 const getUserByPhoneNumber = (phoneNumber) => {
     return new Promise((resolve, reject) => {
-        db.get(`SELECT * FROM users WHERE phone_number = ?`, [phoneNumber], (err, row) => {
+        pool.query(`SELECT * FROM users WHERE phone_number = $1`, [phoneNumber], (err, res) => {
             if (err) {
                 console.error('Ошибка при выполнении запроса:', err.message);
                 reject(err);
             } else {
-                resolve(row);
+                resolve(res.rows[0]);
             }
         });
     });
 };
+
 const getUserByChatId = (chatId) => {
     return new Promise((resolve, reject) => {
-        db.get(`SELECT * FROM users WHERE id = ?`, [chatId], (err, row) => {
+        pool.query(`SELECT * FROM users WHERE id = $1`, [chatId], (err, res) => {
             if (err) {
                 console.error('Ошибка при выполнении запроса:', err.message);
                 reject(err);
             } else {
-                resolve(row);
+                resolve(res.rows[0]);
             }
         });
     });
 };
-const getAllTasksByDate = (date) => {
+
+const getAllTasksInGroup = (group_id) => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT * FROM tasks WHERE date = ?`, [date], (err, rows) => {
+        pool.query(`SELECT * FROM tasks WHERE group_id = $1`, [group_id], (err, res) => {
             if (err) {
-                console.error('Ошибка при получении задач по дате:', err.message);
+                console.error('Ошибка при получении задач в группе:', err.message);
                 reject(err);
             } else {
-                console.log("данные по дате получены - успешно!")
-                resolve(rows);
+                console.log("Tasks fetched successfully for group:", res.rows);
+                resolve(res.rows);
             }
         });
     });
 };
-const getAllTasksByDateAndUsername = (date, username) => {
+
+const addUserToGroup = (group_name, group_id, group_creator, username) => {
+    pool.query(`INSERT INTO groupsUsers (group_name, group_id, group_creator, username) VALUES ($1, $2, $3, $4)`, [group_name, group_id, group_creator, username], (err) => {
+        if (err) {
+            console.error('Ошибка при добавлении пользователя в группу:', err.message);
+        } else {
+            console.log('Пользователь успешно добавлен в группу');
+        }
+    });
+};
+
+const getGroupsByUsername = (username) => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT * FROM tasks WHERE date = ? AND recipient = ?`, [date, username], (err, rows) => {
+        pool.query(`SELECT * FROM groupsUsers WHERE username = $1`, [username], (err, res) => {
             if (err) {
-                console.error('Ошибка при получении задач по дате и имени пользователя:', err.message);
+                console.error('Ошибка при получении групп по имени пользователя:', err.message);
                 reject(err);
             } else {
-                console.log("данные по дате и имени пользователя получены - успешно!")
-                resolve(rows);
+                resolve(res.rows);
             }
         });
     });
 };
-module.exports = { addUser, getAllGroupsByUsername,getUserByChatId,getTaskById,moveTaskToNextDay, getAllUsers,getAllTasksByDateAndUsername,getAllTasksByDate, getUserByPhoneNumber,getAllTasksByDate,checkUser,getAllTasksByTo, getAllTasksInUsers, getChatID, updateUser, addTask, deleteTask, addGroup, deleteGroup, updateTask };
+
+module.exports = {
+    addUser,
+    getChatID,
+    updateUser,
+    addTask,
+    getAllUsers,
+    deleteTask,
+    updateTask,
+    getAllTasksByTo,
+    addGroup,
+    moveTaskToNextDay,
+    getTaskById,
+    deleteGroup,
+    getAllTasksInUsers,
+    getAllGroupsByUsername,
+    checkUser,
+    getUserByPhoneNumber,
+    getUserByChatId,
+    getAllTasksInGroup,
+    addUserToGroup,
+    getGroupsByUsername
+};

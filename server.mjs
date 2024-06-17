@@ -4,7 +4,15 @@ import TelegramBot from 'node-telegram-bot-api';
 import crypto from 'crypto';
 import cors from 'cors';
 import clipboardy from 'clipboardy';
-import { addUser, getTaskById, getUserByChatId, moveTaskToNextDay, getAllGroupsByUsername,getAllUsers, getAllTasksByDateAndUsername, getAllTasksByTo, getUserByPhoneNumber, getChatID, checkUser, updateUser, addTask, deleteTask, updateTask, getAllTasksByDate, addGroup, deleteGroup, getAllTasksInUsers } from './datebase.js';
+import database from './datebase.js'; // Import the entire module
+
+const {
+    addUser, getTaskById, getUserByChatId, moveTaskToNextDay,
+    getAllGroupsByUsername, getAllUsers, getAllTasksByDateAndUsername,
+    getAllTasksByTo, getUserByPhoneNumber, getChatID, checkUser, updateUser,
+    addTask, deleteTask, updateTask, getAllTasksByDate, addGroup, deleteGroup,
+    getAllTasksInUsers
+} = database;
 
 const app = express();
 app.use(bodyParser.json());
