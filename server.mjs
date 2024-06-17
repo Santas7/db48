@@ -42,6 +42,7 @@ app.post('/api/send-code', async (req, res) => {
         console.log(user)
         if (user) {
             const chatId = user.id;
+            console.log(phoneNumber, chatId)
             await updateUser(phoneNumber, code); // Wait for updateUser to complete
             await sendTelegramCode(chatId, code); // Wait for sendTelegramCode to complete
             res.sendStatus(200);
@@ -347,18 +348,6 @@ app.get('/api/alltasks', async (req, res) => {
 });
 
 
-app.delete('/api/delete-group/:groupId', (req, res) => {
-    const groupId = req.params.groupId;
-    deleteGroup(groupId);
-    res.sendStatus(200);
-});
-
-app.get('/api/tasks-in-group/:groupId', (req, res) => {
-    const groupId = req.params.groupId;
-    getAllTasksInGroup(groupId)
-        .then(tasks => res.status(200).json(tasks))
-        .catch(err => res.status(500).json({ error: 'Ошибка при получении задач в группе' }));
-});
 
 app.listen(3001, () => {
     console.log('Server running on port 3001');
