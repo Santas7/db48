@@ -3,7 +3,7 @@ import bodyParser from 'body-parser';
 import TelegramBot from 'node-telegram-bot-api';
 import crypto from 'crypto';
 import cors from 'cors';
-import clipboardy from 'clipboardy';
+//import clipboardy from 'clipboardy';
 import database from './datebase.js'; // Import the entire module
 
 const {
@@ -25,7 +25,7 @@ const generateCode = () => crypto.randomBytes(6).toString('hex');
 const sendTelegramCode = async (chatId, code) => {
     const user = await getUserByChatId(chatId);
     const userCode = user.code; // Переименуем переменную
-    clipboardy.writeSync(userCode);
+    //clipboardy.writeSync(userCode);
     const message = `Ваш код подтверждения (уже скопирован в буфер): ${userCode}`;
     await bot.sendMessage(chatId, message);
 };
