@@ -17,7 +17,7 @@ const {
 const app = express();
 app.use(bodyParser.json());
 app.use(cors()); // Разрешить все CORS-запросы
-const token = '6812469101:AAE2xy7j6cmksWh7IUlf3GqrEJiXO05IqXo';
+const token = '7462393619:AAFEzTBkOKglJgqOJeeCVZtWZMUCwcK9VwE';
 const bot = new TelegramBot(token, { polling: true });
 
 const generateCode = () => crypto.randomBytes(6).toString('hex');
