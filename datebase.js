@@ -270,15 +270,14 @@ const getAllTasksInGroup = (group_id) => {
                 console.error('Ошибка при получении задач в группе:', err.message);
                 reject(err);
             } else {
-                console.log("Tasks fetched successfully for group:", res.rows);
                 resolve(res.rows);
             }
         });
     });
 };
 
-const addUserToGroup = (group_name, group_id, group_creator, username) => {
-    pool.query(`INSERT INTO groupsUsers (group_name, group_id, group_creator, username) VALUES ($1, $2, $3, $4)`, [group_name, group_id, group_creator, username], (err) => {
+const addUserToGroup = (group_id, username) => {
+    pool.query(`INSERT INTO groupsUsers (group_id, username) VALUES ($1, $2)`, [group_id, username], (err) => {
         if (err) {
             console.error('Ошибка при добавлении пользователя в группу:', err.message);
         } else {
@@ -287,14 +286,37 @@ const addUserToGroup = (group_name, group_id, group_creator, username) => {
     });
 };
 
-const getGroupsByUsername = (username) => {
+const deleteUserFromGroup = (group_id, username) => {
+    pool.query(`DELETE FROM groupsUsers WHERE group_id = $1 AND username = $2`, [group_id, username], (err) => {
+        if (err) {
+            console.error('Ошибка при удалении пользователя из группы:', err.message);
+        } else {
+            console.log('Пользователь успешно удален из группы');
+        }
+    });
+};
+
+const getAllUsersInGroup = (group_id) => {
     return new Promise((resolve, reject) => {
-        pool.query(`SELECT * FROM groupsUsers WHERE username = $1`, [username], (err, res) => {
+        pool.query(`SELECT * FROM groupsUsers WHERE group_id = $1`, [group_id], (err, res) => {
             if (err) {
-                console.error('Ошибка при получении групп по имени пользователя:', err.message);
+                console.error('Ошибка при получении пользователей в группе:', err.message);
                 reject(err);
             } else {
                 resolve(res.rows);
+            }
+        });
+    });
+};
+
+const getUserByUsername = (username) => {
+    return new Promise((resolve, reject) => {
+        pool.query(`SELECT * FROM users WHERE username = $1`, [username], (err, res) => {
+            if (err) {
+                console.error('Ошибка при выполнении запроса:', err.message);
+                reject(err);
+            } else {
+                resolve(res.rows[0]);
             }
         });
     });
@@ -320,5 +342,7 @@ module.exports = {
     getUserByChatId,
     getAllTasksInGroup,
     addUserToGroup,
-    getGroupsByUsername
+    deleteUserFromGroup,
+    getAllUsersInGroup,
+    getUserByUsername
 };
